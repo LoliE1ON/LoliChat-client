@@ -15,6 +15,8 @@ namespace E1on.Network {
         
         private Vector3 lastPosition;
         private Quaternion lastRotation;
+
+        private string session;
         
 
         void Start() {
@@ -25,13 +27,17 @@ namespace E1on.Network {
             
             lastPosition = playerTransform.position;
             this.lastRotation = playerTransform.rotation;
+
+            session = GameController.getInstance.session;
         }
 
         void Update() {
             if ((Vector3.Distance(lastPosition, transform.position) > moveDistance) || lastRotation != transform.rotation) {
                 
-                using (DarkRiftWriter writer = DarkRiftWriter.Create())
-                {
+                using (DarkRiftWriter writer = DarkRiftWriter.Create()) {
+
+                    writer.Write(session);
+                    
                     // Position
                     writer.Write(transform.position.x);
                     writer.Write(transform.position.y);

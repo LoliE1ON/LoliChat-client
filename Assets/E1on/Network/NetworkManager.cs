@@ -1,9 +1,11 @@
 ﻿using System.Linq;
+using System.Net;
 using DarkRift;
 using DarkRift.Client;
 using DarkRift.Client.Unity;
 using E1on.Player;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace E1on.Network {
     public class NetworkManager : MonoBehaviour {
@@ -14,42 +16,30 @@ namespace E1on.Network {
         private void Start() {
             client = GameController.getInstance.unityClient;
             playerManager = GameController.getInstance.playerManager;
+            Connect();
         }
         
-        public void Connect() {
-            //client.Connect(System.Net.IPAddress.Parse(GameController.getInstance.ip), GameController.getInstance.port, true);
-            client.Connect(System.Net.IPAddress.Parse("127.0.0.1"), GameController.getInstance.port, true);
+        private void Connect() {
+            client.Connect(System.Net.IPAddress.Parse(GameController.getInstance.ip), GameController.getInstance.port, true);
+            //client.Connect(System.Net.IPAddress.Parse("127.0.0.1"), GameController.getInstance.port, true);
             client.MessageReceived += MessageReceived;
         }
         
         private void MessageReceived(object sender, MessageReceivedEventArgs e) {
             using (Message message = e.GetMessage() as Message) {
+                if (message.Tag == Tags.AuthorizationSuccess) AuthorizationSuccess(e);
+                if (message.Tag == Tags.AuthorizationFailed) AuthorizationFailed(e);
                 
-                if (message.Tag == Tags.ConnectedPlayer) ConnectedPlayer(e);
-                if (message.Tag == Tags.DisconnectedPlayer) DisconnectedPlayer(e);
-                
-                if (message.Tag == Tags.SpawnNewPlayer) SpawnNewPlayer(e);
-                if (message.Tag == Tags.SpawnCurrentPlayer) SpawnCurrentPlayer(e);
-                
-                if (message.Tag == Tags.PlayerDetails) PlayerDetails(e);
+                if (SceneManager.GetActiveScene().name == "WorldScene") {
+                    if (message.Tag == Tags.DisconnectedPlayer) DisconnectedPlayer(e);
+                    if (message.Tag == Tags.PlayerDetails) PlayerDetails(e);
+                    if (message.Tag == Tags.SpawnCurrentPlayer) SpawnCurrentPlayer(e);
+                    if (message.Tag == Tags.SpawnNewPlayer) SpawnNewPlayer(e);
+                }
                 
             }
         }
         
-        // Authentication
-        void ConnectedPlayer(MessageReceivedEventArgs e) {
-            GameController.getInstance.id = client.ID;
-            
-            using (DarkRiftWriter writer = DarkRiftWriter.Create()) {
-                writer.Write(GameController.getInstance.username);
-                writer.Write(GameController.getInstance.password);
-                writer.Write(GameController.getInstance.avatar);
-                using (Message message = Message.Create(Tags.Authentication, writer)) {
-                    client.SendMessage(message, SendMode.Unreliable);
-                }
-            }
-        }
-
         private void SpawnNewPlayer(MessageReceivedEventArgs e) {
             SpawnPlayer(e);
             using (Message message = e.GetMessage())
@@ -66,11 +56,7 @@ namespace E1on.Network {
         void SpawnPlayer(MessageReceivedEventArgs e) {
             using (Message message = e.GetMessage())
             using (DarkRiftReader reader = message.GetReader()) {
-                
-                // Set session
-                var session = reader.ReadString();
-                if (session.Length > 0) GameController.getInstance.session = session;
-                
+
                 while (reader.Position < reader.Length) {
                     var id = reader.ReadUInt16();
                     var username = reader.ReadString();
@@ -103,11 +89,26 @@ namespace E1on.Network {
                             Quaternion.identity);
                     }
                     
-                    Debug.Log("Spawn " + username + " Avatar " + avatar);
+                    Debug.Log("Spawn " + username + ":"+ id+" Avatar " + avatar);
                 }
             }
         }
+                
+        void AuthorizationSuccess(MessageReceivedEventArgs e) {
+            using (Message message = e.GetMessage())
+            using (DarkRiftReader reader = message.GetReader()) {
+                GameController.getInstance.session = reader.ReadString();
+                GameController.getInstance.eventManager.LoginSuccessAuthorizationEvent();
+            }
+        }
         
+        void AuthorizationFailed(MessageReceivedEventArgs e) {
+            using (Message message = e.GetMessage())
+            using (DarkRiftReader reader = message.GetReader()) {
+                GameController.getInstance.eventManager.LoginFailedAuthorizationEvent();
+            }
+        }
+
         void DisconnectedPlayer(MessageReceivedEventArgs e) {
             using (Message message = e.GetMessage()) {
                 using (DarkRiftReader reader = message.GetReader()) {

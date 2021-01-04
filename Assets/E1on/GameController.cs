@@ -1,8 +1,11 @@
 ﻿using System;
+using DarkRift;
 using DarkRift.Client.Unity;
+using E1on.Asset;
 using E1on.Network;
 using E1on.Player;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace E1on {
     public class GameController : MonoBehaviour {
@@ -22,11 +25,13 @@ namespace E1on {
         public UnityClient unityClient;
         public Prefabs prefabs;
         public NetworkManager networkManager;
+        public NetworkMessageSender networkMessageSender;
+        public AvatarManager avatarManager;
         
         [Header("Server settings")]
         public string ip = "5.180.138.37";
         public int port = 4296;
-
+        
         private void Awake () {
             if (getInstance == null) {
                 DontDestroyOnLoad (gameObject);
